@@ -73,7 +73,7 @@ function Water() {
       info.g += (average - info.r) * 2.0;\
       \
       /* attenuate the velocity a little so waves do not last forever */\
-      info.g *= 0.99;\
+      info.g *= 0.98;\
       \
       /* move the vertex along the velocity */\
       info.r += info.g;\
