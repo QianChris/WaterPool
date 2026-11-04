@@ -220,6 +220,5 @@ Water.prototype.sampleHeight = function(x, z) {
   var vy = lerp(lerp(c00.vy, c10.vy, dx), lerp(c01.vy, c11.vy, dx), dz);
   var nx = lerp(lerp(c00.nx, c10.nx, dx), lerp(c01.nx, c11.nx, dx), dz);
   var nz = lerp(lerp(c00.nz, c10.nz, dx), lerp(c01.nz, c11.nz, dx), dz);
-  var s = Physics.HORIZONTAL_COUPLING;
-  return { h: hh, vx: nx * s, vy: vy, vz: nz * s };
+  return { h: hh, nx: nx, nz: nz, vy: vy };
 };

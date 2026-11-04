@@ -27,6 +27,9 @@
   Physics.HORIZONTAL_COUPLING = 5.;
   Physics.VEL_DAMP = 0.99;
   Physics.DRAG_RELEASE = 0.5;
+  Physics.LOW_SPEED_THRESHOLD = 0.5;
+  Physics.LOW_GAIN = 0.25;
+  Physics.VEL_DAMP_LOW = 0.995;
 
   Physics.worldToTex = function (x, z) {
     return { u: x / Physics.POOL_WIDTH + 0.5, v: z / Physics.POOL_DEPTH + 0.5 };
@@ -73,6 +76,10 @@
     ball.vy += Physics.verticalAccel(ball, h) * dt;
 
     var speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy + ball.vz * ball.vz);
+    var s = Math.min(1, speed / Physics.LOW_SPEED_THRESHOLD);
+    var couplingScale = Physics.LOW_GAIN + (1 - Physics.LOW_GAIN) * s;
+    var damp = Physics.VEL_DAMP_LOW + (Physics.VEL_DAMP - Physics.VEL_DAMP_LOW) * s;
+
     var k = Physics.DRAG * f * speed;
     ball.vx -= k * ball.vx * dt;
     ball.vy -= k * ball.vy * dt;
@@ -83,14 +90,17 @@
     ball.vy -= lin * ball.vy * dt;
     ball.vz -= lin * ball.vz * dt;
 
-    var wc = Physics.WATER_COUPLING * f;
-    ball.vx += (water.vx - ball.vx) * wc * dt;
+    var hScale = Physics.HORIZONTAL_COUPLING * couplingScale;
+    var vxWater = water.nx * hScale;
+    var vzWater = water.nz * hScale;
+    var wc = Physics.WATER_COUPLING * couplingScale * f;
+    ball.vx += (vxWater - ball.vx) * wc * dt;
     ball.vy += (water.vy - ball.vy) * wc * dt;
-    ball.vz += (water.vz - ball.vz) * wc * dt;
+    ball.vz += (vzWater - ball.vz) * wc * dt;
 
-    ball.vx *= Physics.VEL_DAMP;
-    ball.vy *= Physics.VEL_DAMP;
-    ball.vz *= Physics.VEL_DAMP;
+    ball.vx *= damp;
+    ball.vy *= damp;
+    ball.vz *= damp;
 
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
