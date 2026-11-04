@@ -27,7 +27,7 @@
   Physics.HORIZONTAL_COUPLING = 5.;
   Physics.VEL_DAMP = 0.99;
   Physics.DRAG_RELEASE = 0.5;
-  Physics.LOW_SPEED_THRESHOLD = 0.5;
+  Physics.LOW_SPEED_THRESHOLD = 0.05;
   Physics.LOW_GAIN = 0.25;
   Physics.VEL_DAMP_LOW = 0.995;
 
