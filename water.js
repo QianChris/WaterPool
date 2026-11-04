@@ -20,12 +20,14 @@ function Water() {
     throw new Error('This demo requires the OES_texture_float extension');
   }
   var filter = GL.Texture.canUseFloatingPointLinearFiltering() ? gl.LINEAR : gl.NEAREST;
-  this.textureA = new GL.Texture(256, 256, { type: gl.FLOAT, filter: filter });
-  this.textureB = new GL.Texture(256, 256, { type: gl.FLOAT, filter: filter });
+  var gridH = 256;
+  var gridW = Math.round(gridH * Physics.POOL_WIDTH / Physics.POOL_DEPTH);
+  this.textureA = new GL.Texture(gridW, gridH, { type: gl.FLOAT, filter: filter });
+  this.textureB = new GL.Texture(gridW, gridH, { type: gl.FLOAT, filter: filter });
   if ((!this.textureA.canDrawTo() || !this.textureB.canDrawTo()) && GL.Texture.canUseHalfFloatingPointTextures()) {
     filter = GL.Texture.canUseHalfFloatingPointLinearFiltering() ? gl.LINEAR : gl.NEAREST;
-    this.textureA = new GL.Texture(256, 256, { type: gl.HALF_FLOAT_OES, filter: filter });
-    this.textureB = new GL.Texture(256, 256, { type: gl.HALF_FLOAT_OES, filter: filter });
+    this.textureA = new GL.Texture(gridW, gridH, { type: gl.HALF_FLOAT_OES, filter: filter });
+    this.textureB = new GL.Texture(gridW, gridH, { type: gl.HALF_FLOAT_OES, filter: filter });
   }
   this.dropShader = new GL.Shader(vertexShader, '\
     const float PI = 3.141592653589793;\
@@ -71,7 +73,7 @@ function Water() {
       info.g += (average - info.r) * 2.0;\
       \
       /* attenuate the velocity a little so waves do not last forever */\
-      info.g *= 0.995;\
+      info.g *= 0.99;\
       \
       /* move the vertex along the velocity */\
       info.r += info.g;\
@@ -127,8 +129,10 @@ function Water() {
       gl_FragColor = info;\
     }\
   ');
-  this.heightTex = new GL.Texture(64, 64, { type: gl.FLOAT, filter: gl.LINEAR });
-  this.heightData = new Float32Array(64 * 64 * 4);
+  var readH = 64;
+  var readW = Math.round(readH * Physics.POOL_WIDTH / Physics.POOL_DEPTH);
+  this.heightTex = new GL.Texture(readW, readH, { type: gl.FLOAT, filter: gl.LINEAR });
+  this.heightData = new Float32Array(readW * readH * 4);
   this.downsampleShader = new GL.Shader(vertexShader, '\
     uniform sampler2D texture;\
     varying vec2 coord;\
@@ -205,15 +209,17 @@ Water.prototype.sampleHeight = function(x, z) {
   var heightData = this.heightData;
   function sample(gx, gz) {
     var i = (gz * w + gx) * 4;
-    return { h: heightData[i], vy: heightData[i + 1] };
+    return { h: heightData[i], vy: heightData[i + 1], nx: heightData[i + 2], nz: heightData[i + 3] };
   }
+  function lerp(a, b, t) { return a * (1 - t) + b * t; }
   var c00 = sample(x0, z0);
   var c10 = sample(x1, z0);
   var c01 = sample(x0, z1);
   var c11 = sample(x1, z1);
-  var h0 = c00.h * (1 - dx) + c10.h * dx;
-  var h1 = c01.h * (1 - dx) + c11.h * dx;
-  var vy0 = c00.vy * (1 - dx) + c10.vy * dx;
-  var vy1 = c01.vy * (1 - dx) + c11.vy * dx;
-  return { h: h0 * (1 - dz) + h1 * dz, vy: vy0 * (1 - dz) + vy1 * dz };
+  var hh = lerp(lerp(c00.h, c10.h, dx), lerp(c01.h, c11.h, dx), dz);
+  var vy = lerp(lerp(c00.vy, c10.vy, dx), lerp(c01.vy, c11.vy, dx), dz);
+  var nx = lerp(lerp(c00.nx, c10.nx, dx), lerp(c01.nx, c11.nx, dx), dz);
+  var nz = lerp(lerp(c00.nz, c10.nz, dx), lerp(c01.nz, c11.nz, dx), dz);
+  var s = Physics.HORIZONTAL_COUPLING;
+  return { h: hh, vx: nx * s, vy: vy, vz: nz * s };
 };

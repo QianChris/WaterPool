@@ -23,6 +23,9 @@
   Physics.RESTITUTION = 0.7;
   Physics.DRAG = 1.0;
   Physics.LINEAR_DRAG = 5.0;
+  Physics.WATER_COUPLING = 1.5;
+  Physics.HORIZONTAL_COUPLING = 0.3;
+  Physics.VEL_DAMP = 0.99;
 
   Physics.worldToTex = function (x, z) {
     return { u: x / Physics.POOL_WIDTH + 0.5, v: z / Physics.POOL_DEPTH + 0.5 };
@@ -60,7 +63,8 @@
     return Physics.GRAVITY * (ratio - 1);
   };
 
-  Physics.stepBall = function (ball, h, vyWater, dt) {
+  Physics.stepBall = function (ball, water, dt) {
+    var h = water.h;
     var vSub = Physics.submergedVolume(ball.r, ball.y, h);
     var vTotal = Physics.sphereVolume(ball.r);
     var f = vSub / vTotal;
@@ -78,7 +82,14 @@
     ball.vy -= lin * ball.vy * dt;
     ball.vz -= lin * ball.vz * dt;
 
-    ball.vy += (vyWater - ball.vy) * f * dt;
+    var wc = Physics.WATER_COUPLING * f;
+    ball.vx += (water.vx - ball.vx) * wc * dt;
+    ball.vy += (water.vy - ball.vy) * wc * dt;
+    ball.vz += (water.vz - ball.vz) * wc * dt;
+
+    ball.vx *= Physics.VEL_DAMP;
+    ball.vy *= Physics.VEL_DAMP;
+    ball.vz *= Physics.VEL_DAMP;
 
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;

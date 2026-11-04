@@ -231,10 +231,12 @@ window.onload = function() {
     for (var i = 0; i < balls.length; i++) {
       var ball = balls[i];
       if (i === dragBall && mode === MODE_MOVE_SPHERE) {
-        ball.vx = ball.vy = ball.vz = 0;
+        var invDt = 1 / Math.max(seconds, 0.001);
+        ball.vx = (ball.x - ball.prev.x) * invDt;
+        ball.vy = (ball.y - ball.prev.y) * invDt;
+        ball.vz = (ball.z - ball.prev.z) * invDt;
       } else {
-        var s = water.sampleHeight(ball.x, ball.z);
-        Physics.stepBall(ball, s.h, s.vy, seconds);
+        Physics.stepBall(ball, water.sampleHeight(ball.x, ball.z), seconds);
       }
     }
 
