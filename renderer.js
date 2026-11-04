@@ -115,7 +115,7 @@ function Renderer() {
     wrap: gl.REPEAT,
     format: gl.RGB
   });
-  this.lightDir = new GL.Vector(2.0, 2.0, -1.0).unit();
+  this.lightDir = new GL.Vector(2.0, 6.0, -1.0).unit();
   this.causticTex = new GL.Texture(1024, 1024);
   this.waterMesh = GL.Mesh.plane({ detail: 200 });
   this.waterShaders = [];
