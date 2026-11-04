@@ -12,8 +12,8 @@ var helperFunctions = '\
   const vec3 abovewaterColor = vec3(0.25, 1.0, 1.25);\
   const vec3 underwaterColor = vec3(0.4, 0.9, 1.0);\
   const float poolHeight = 1.0;\
-  const float HALF_W = ' + Physics.HALF_W + ';\
-  const float HALF_D = ' + Physics.HALF_D + ';\
+  const float HALF_W = float(' + Physics.HALF_W + ');\
+  const float HALF_D = float(' + Physics.HALF_D + ');\
   uniform vec3 light;\
   uniform vec3 sphereCenter;\
   uniform float sphereRadius;\
@@ -123,8 +123,8 @@ function Renderer() {
     this.waterShaders[i] = new GL.Shader('\
       uniform sampler2D water;\
       varying vec3 position;\
-      const float HALF_W = ' + Physics.HALF_W + ';\
-      const float HALF_D = ' + Physics.HALF_D + ';\
+      const float HALF_W = float(' + Physics.HALF_W + ');\
+      const float HALF_D = float(' + Physics.HALF_D + ');\
       void main() {\
         vec4 info = texture2D(water, gl_Vertex.xy * 0.5 + 0.5);\
         position = gl_Vertex.xzy;\

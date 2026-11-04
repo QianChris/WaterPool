@@ -29,8 +29,8 @@ function Water() {
   }
   this.dropShader = new GL.Shader(vertexShader, '\
     const float PI = 3.141592653589793;\
-    const float HALF_W = ' + Physics.HALF_W + ';\
-    const float HALF_D = ' + Physics.HALF_D + ';\
+    const float HALF_W = float(' + Physics.HALF_W + ');\
+    const float HALF_D = float(' + Physics.HALF_D + ');\
     uniform sampler2D texture;\
     uniform vec2 center;\
     uniform float radius;\
@@ -96,8 +96,8 @@ function Water() {
     }\
   ');
   this.sphereShader = new GL.Shader(vertexShader, '\
-    const float HALF_W = ' + Physics.HALF_W + ';\
-    const float HALF_D = ' + Physics.HALF_D + ';\
+    const float HALF_W = float(' + Physics.HALF_W + ');\
+    const float HALF_D = float(' + Physics.HALF_D + ');\
     uniform sampler2D texture;\
     uniform vec3 oldCenter;\
     uniform vec3 newCenter;\
