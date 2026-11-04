@@ -23,9 +23,10 @@
   Physics.RESTITUTION = 0.7;
   Physics.DRAG = 1.0;
   Physics.LINEAR_DRAG = 5.0;
-  Physics.WATER_COUPLING = 1.5;
-  Physics.HORIZONTAL_COUPLING = 0.3;
+  Physics.WATER_COUPLING = 2.;
+  Physics.HORIZONTAL_COUPLING = 5.;
   Physics.VEL_DAMP = 0.99;
+  Physics.DRAG_RELEASE = 0.5;
 
   Physics.worldToTex = function (x, z) {
     return { u: x / Physics.POOL_WIDTH + 0.5, v: z / Physics.POOL_DEPTH + 0.5 };

@@ -232,9 +232,9 @@ window.onload = function() {
       var ball = balls[i];
       if (i === dragBall && mode === MODE_MOVE_SPHERE) {
         var invDt = 1 / Math.max(seconds, 0.001);
-        ball.vx = (ball.x - ball.prev.x) * invDt;
-        ball.vy = (ball.y - ball.prev.y) * invDt;
-        ball.vz = (ball.z - ball.prev.z) * invDt;
+        ball.vx = (ball.x - ball.prev.x) * invDt * Physics.DRAG_RELEASE;
+        ball.vy = (ball.y - ball.prev.y) * invDt * Physics.DRAG_RELEASE;
+        ball.vz = (ball.z - ball.prev.z) * invDt * Physics.DRAG_RELEASE;
       } else {
         Physics.stepBall(ball, water.sampleHeight(ball.x, ball.z), seconds);
       }
