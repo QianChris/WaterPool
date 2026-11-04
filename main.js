@@ -30,6 +30,7 @@ var cubemap;
 var renderer;
 var angleX = -90;
 var angleY = 0;
+var CAMERA_DISTANCE = 6;
 var paused = false;
 
 var balls = [];
@@ -109,6 +110,7 @@ window.onload = function() {
   var dragBall = -1;
   var MODE_ADD_DROPS = 0;
   var MODE_MOVE_SPHERE = 1;
+  var MODE_ORBIT_CAMERA = 2;
 
   var oldX, oldY;
 
@@ -134,6 +136,8 @@ window.onload = function() {
     } else if (Math.abs(pointOnPlane.x) < Physics.HALF_W && Math.abs(pointOnPlane.z) < Physics.HALF_D) {
       mode = MODE_ADD_DROPS;
       duringDrag(x, y);
+    } else {
+      mode = MODE_ORBIT_CAMERA;
     }
   }
 
@@ -164,6 +168,12 @@ window.onload = function() {
         ball.z = Math.max(ball.r - Physics.HALF_D, Math.min(Physics.HALF_D - ball.r, ball.z));
         prevHit = nextHit;
         if (paused) renderer.updateCaustics(water);
+        break;
+      }
+      case MODE_ORBIT_CAMERA: {
+        angleY -= x - oldX;
+        angleX -= y - oldY;
+        angleX = Math.max(-89.999, Math.min(89.999, angleX));
         break;
       }
     }
@@ -253,11 +263,7 @@ window.onload = function() {
   function draw() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.loadIdentity();
-
-    var tanHalfFov = Math.tan(22.5 * Math.PI / 180);
-    var aspect = gl.canvas.width / gl.canvas.height;
-    var dist = Math.max(Physics.HALF_D / tanHalfFov, Physics.HALF_W / (tanHalfFov * aspect)) * 1.1;
-    gl.translate(0, 0, -dist);
+    gl.translate(0, 0, -CAMERA_DISTANCE);
     gl.rotate(-angleX, 1, 0, 0);
     gl.rotate(-angleY, 0, 1, 0);
 

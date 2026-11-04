@@ -22,6 +22,7 @@
   Physics.WATER_DENSITY = 1;
   Physics.RESTITUTION = 0.7;
   Physics.DRAG = 1.0;
+  Physics.LINEAR_DRAG = 5.0;
 
   Physics.worldToTex = function (x, z) {
     return { u: x / Physics.POOL_WIDTH + 0.5, v: z / Physics.POOL_DEPTH + 0.5 };
@@ -71,6 +72,11 @@
     ball.vx -= k * ball.vx * dt;
     ball.vy -= k * ball.vy * dt;
     ball.vz -= k * ball.vz * dt;
+
+    var lin = Physics.LINEAR_DRAG * f;
+    ball.vx -= lin * ball.vx * dt;
+    ball.vy -= lin * ball.vy * dt;
+    ball.vz -= lin * ball.vz * dt;
 
     ball.vy += (vyWater - ball.vy) * f * dt;
 
