@@ -28,24 +28,18 @@ var gl = GL.create();
 var water;
 var cubemap;
 var renderer;
-var angleX = -25;
-var angleY = -200.5;
-
-// Sphere physics info
-var useSpherePhysics = false;
-var center;
-var oldCenter;
-var velocity;
-var gravity;
-var radius;
+var angleX = -90;
+var angleY = 0;
 var paused = false;
+
+var balls = [];
+var DROP_RADIUS = 0.06;
 
 window.onload = function() {
   var ratio = window.devicePixelRatio || 1;
-  var help = document.getElementById('help');
 
   function onresize() {
-    var width = innerWidth - help.clientWidth - 20;
+    var width = innerWidth;
     var height = innerHeight;
     gl.canvas.width = width * ratio;
     gl.canvas.height = height * ratio;
@@ -77,13 +71,14 @@ window.onload = function() {
     throw new Error('Rendering to floating-point textures is required but not supported');
   }
 
-  center = oldCenter = new GL.Vector(-0.4, -0.75, 0.2);
-  velocity = new GL.Vector();
-  gravity = new GL.Vector(0, -4, 0);
-  radius = 0.25;
+  balls = [
+    Physics.createBall(-0.5, 0.3, -0.6, 0.25, 0.5),
+    Physics.createBall(0.4, 0.6, 0.3, 0.22, 0.45),
+    Physics.createBall(0.0, 0.4, -0.2, 0.18, 0.4)
+  ];
 
   for (var i = 0; i < 20; i++) {
-    water.addDrop(Math.random() * 2 - 1, Math.random() * 2 - 1, 0.03, (i & 1) ? 0.01 : -0.01);
+    water.addDrop(Math.random() * Physics.POOL_WIDTH - Physics.HALF_W, Math.random() * Physics.POOL_DEPTH - Physics.HALF_D, 0.03, (i & 1) ? 0.01 : -0.01);
   }
 
   document.getElementById('loading').innerHTML = '';
@@ -111,9 +106,9 @@ window.onload = function() {
   var prevHit;
   var planeNormal;
   var mode = -1;
+  var dragBall = -1;
   var MODE_ADD_DROPS = 0;
   var MODE_MOVE_SPHERE = 1;
-  var MODE_ORBIT_CAMERA = 2;
 
   var oldX, oldY;
 
@@ -123,16 +118,22 @@ window.onload = function() {
     var tracer = new GL.Raytracer();
     var ray = tracer.getRayForPixel(x * ratio, y * ratio);
     var pointOnPlane = tracer.eye.add(ray.multiply(-tracer.eye.y / ray.y));
-    var sphereHitTest = GL.Raytracer.hitTestSphere(tracer.eye, ray, center, radius);
-    if (sphereHitTest) {
+    var nearestT = Infinity;
+    dragBall = -1;
+    for (var i = 0; i < balls.length; i++) {
+      var hit = GL.Raytracer.hitTestSphere(tracer.eye, ray, new GL.Vector(balls[i].x, balls[i].y, balls[i].z), balls[i].r);
+      if (hit && hit.t < nearestT) {
+        nearestT = hit.t;
+        dragBall = i;
+        prevHit = hit.hit;
+      }
+    }
+    if (dragBall >= 0) {
       mode = MODE_MOVE_SPHERE;
-      prevHit = sphereHitTest.hit;
       planeNormal = tracer.getRayForPixel(gl.canvas.width / 2, gl.canvas.height / 2).negative();
-    } else if (Math.abs(pointOnPlane.x) < 1 && Math.abs(pointOnPlane.z) < 1) {
+    } else if (Math.abs(pointOnPlane.x) < Physics.HALF_W && Math.abs(pointOnPlane.z) < Physics.HALF_D) {
       mode = MODE_ADD_DROPS;
       duringDrag(x, y);
-    } else {
-      mode = MODE_ORBIT_CAMERA;
     }
   }
 
@@ -142,7 +143,7 @@ window.onload = function() {
         var tracer = new GL.Raytracer();
         var ray = tracer.getRayForPixel(x * ratio, y * ratio);
         var pointOnPlane = tracer.eye.add(ray.multiply(-tracer.eye.y / ray.y));
-        water.addDrop(pointOnPlane.x, pointOnPlane.z, 0.03, 0.01);
+        water.addDrop(pointOnPlane.x, pointOnPlane.z, DROP_RADIUS, 0.01);
         if (paused) {
           water.updateNormals();
           renderer.updateCaustics(water);
@@ -154,18 +155,15 @@ window.onload = function() {
         var ray = tracer.getRayForPixel(x * ratio, y * ratio);
         var t = -planeNormal.dot(tracer.eye.subtract(prevHit)) / planeNormal.dot(ray);
         var nextHit = tracer.eye.add(ray.multiply(t));
-        center = center.add(nextHit.subtract(prevHit));
-        center.x = Math.max(radius - 1, Math.min(1 - radius, center.x));
-        center.y = Math.max(radius - 1, Math.min(10, center.y));
-        center.z = Math.max(radius - 1, Math.min(1 - radius, center.z));
+        var ball = balls[dragBall];
+        ball.x += nextHit.x - prevHit.x;
+        ball.y += nextHit.y - prevHit.y;
+        ball.z += nextHit.z - prevHit.z;
+        ball.x = Math.max(ball.r - Physics.HALF_W, Math.min(Physics.HALF_W - ball.r, ball.x));
+        ball.y = Math.max(ball.r + Physics.POOL_BOTTOM, Math.min(10, ball.y));
+        ball.z = Math.max(ball.r - Physics.HALF_D, Math.min(Physics.HALF_D - ball.r, ball.z));
         prevHit = nextHit;
         if (paused) renderer.updateCaustics(water);
-        break;
-      }
-      case MODE_ORBIT_CAMERA: {
-        angleY -= x - oldX;
-        angleX -= y - oldY;
-        angleX = Math.max(-89.999, Math.min(89.999, angleX));
         break;
       }
     }
@@ -176,17 +174,12 @@ window.onload = function() {
 
   function stopDrag() {
     mode = -1;
-  }
-
-  function isHelpElement(element) {
-    return element === help || element.parentNode && isHelpElement(element.parentNode);
+    dragBall = -1;
   }
 
   document.onmousedown = function(e) {
-    if (!isHelpElement(e.target)) {
-      e.preventDefault();
-      startDrag(e.pageX, e.pageY);
-    }
+    e.preventDefault();
+    startDrag(e.pageX, e.pageY);
   };
 
   document.onmousemove = function(e) {
@@ -198,7 +191,7 @@ window.onload = function() {
   };
 
   document.ontouchstart = function(e) {
-    if (e.touches.length === 1 && !isHelpElement(e.target)) {
+    if (e.touches.length === 1) {
       e.preventDefault();
       startDrag(e.touches[0].pageX, e.touches[0].pageY);
     }
@@ -218,38 +211,39 @@ window.onload = function() {
 
   document.onkeydown = function(e) {
     if (e.which == ' '.charCodeAt(0)) paused = !paused;
-    else if (e.which == 'G'.charCodeAt(0)) useSpherePhysics = !useSpherePhysics;
-    else if (e.which == 'L'.charCodeAt(0) && paused) draw();
   };
-
-  var frame = 0;
 
   function update(seconds) {
     if (seconds > 1) return;
-    frame += seconds * 2;
 
-    if (mode == MODE_MOVE_SPHERE) {
-      // Start from rest when the player releases the mouse after moving the sphere
-      velocity = new GL.Vector();
-    } else if (useSpherePhysics) {
-      // Fall down with viscosity under water
-      var percentUnderWater = Math.max(0, Math.min(1, (radius - center.y) / (2 * radius)));
-      velocity = velocity.add(gravity.multiply(seconds - 1.1 * seconds * percentUnderWater));
-      velocity = velocity.subtract(velocity.unit().multiply(percentUnderWater * seconds * velocity.dot(velocity)));
-      center = center.add(velocity.multiply(seconds));
+    water.updateHeightField();
 
-      // Bounce off the bottom
-      if (center.y < radius - 1) {
-        center.y = radius - 1;
-        velocity.y = Math.abs(velocity.y) * 0.7;
+    for (var i = 0; i < balls.length; i++) {
+      var ball = balls[i];
+      if (i === dragBall && mode === MODE_MOVE_SPHERE) {
+        ball.vx = ball.vy = ball.vz = 0;
+      } else {
+        var s = water.sampleHeight(ball.x, ball.z);
+        Physics.stepBall(ball, s.h, s.vy, seconds);
       }
     }
 
-    // Displace water around the sphere
-    water.moveSphere(oldCenter, center, radius);
-    oldCenter = center;
+    for (var i = 0; i < balls.length; i++) {
+      for (var j = i + 1; j < balls.length; j++) {
+        Physics.resolveBallBall(balls[i], balls[j]);
+      }
+    }
 
-    // Update the water simulation and graphics
+    for (var i = 0; i < balls.length; i++) {
+      Physics.resolveWall(balls[i]);
+    }
+
+    for (var i = 0; i < balls.length; i++) {
+      var ball = balls[i];
+      water.moveSphere(ball.prev, ball, ball.r);
+      ball.prev = { x: ball.x, y: ball.y, z: ball.z };
+    }
+
     water.stepSimulation();
     water.stepSimulation();
     water.updateNormals();
@@ -257,25 +251,22 @@ window.onload = function() {
   }
 
   function draw() {
-    // Change the light direction to the camera look vector when the L key is pressed
-    if (GL.keys.L) {
-      renderer.lightDir = GL.Vector.fromAngles((90 - angleY) * Math.PI / 180, -angleX * Math.PI / 180);
-      if (paused) renderer.updateCaustics(water);
-    }
-
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.loadIdentity();
-    gl.translate(0, 0, -4);
+
+    var tanHalfFov = Math.tan(22.5 * Math.PI / 180);
+    var aspect = gl.canvas.width / gl.canvas.height;
+    var dist = Math.max(Physics.HALF_D / tanHalfFov, Physics.HALF_W / (tanHalfFov * aspect)) * 1.1;
+    gl.translate(0, 0, -dist);
     gl.rotate(-angleX, 1, 0, 0);
     gl.rotate(-angleY, 0, 1, 0);
-    gl.translate(0, 0.5, 0);
 
     gl.enable(gl.DEPTH_TEST);
-    renderer.sphereCenter = center;
-    renderer.sphereRadius = radius;
     renderer.renderCube();
     renderer.renderWater(water, cubemap);
-    renderer.renderSphere();
+    for (var i = 0; i < balls.length; i++) {
+      renderer.renderSphere(balls[i].x, balls[i].y, balls[i].z, balls[i].r);
+    }
     gl.disable(gl.DEPTH_TEST);
   }
 };
