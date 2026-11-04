@@ -49,24 +49,27 @@ var helperFunctions = '\
   }\
   \
   vec3 getSphereColor(vec3 point) {\
-    vec3 color = vec3(0.5);\
+    vec3 sphereNormal = (point - sphereCenter) / sphereRadius;\
+    vec3 refractedLight = refract(-light, vec3(0.0, 1.0, 0.0), IOR_AIR / IOR_WATER);\
+    float ndl = max(0.0, dot(-refractedLight, sphereNormal));\
+    \
+    /* directional light: lit side bright, dark side dim */\
+    vec3 color = vec3(0.30);\
+    \
+    vec4 info = texture2D(water, worldToTex(point));\
+    if (point.y < info.r) {\
+      /* underwater: caustics brighten the lit hemisphere */\
+      vec3 shifted = vec3(point.x - point.y * refractedLight.x / refractedLight.y, 0.0, point.z - point.y * refractedLight.z / refractedLight.y);\
+      float caustic = texture2D(causticTex, worldToTex(shifted)).r * 4.0;\
+      color += vec3(0.70) * ndl * caustic;\
+    } else {\
+      color += vec3(0.70) * ndl;\
+    }\
     \
     /* ambient occlusion with walls */\
     color *= 1.0 - 0.9 / pow((HALF_W + sphereRadius - abs(point.x)) / sphereRadius, 3.0);\
     color *= 1.0 - 0.9 / pow((HALF_D + sphereRadius - abs(point.z)) / sphereRadius, 3.0);\
     color *= 1.0 - 0.9 / pow((point.y + 1.0 + sphereRadius) / sphereRadius, 3.0);\
-    \
-    /* caustics */\
-    vec3 sphereNormal = (point - sphereCenter) / sphereRadius;\
-    vec3 refractedLight = refract(-light, vec3(0.0, 1.0, 0.0), IOR_AIR / IOR_WATER);\
-    float diffuse = max(0.0, dot(-refractedLight, sphereNormal)) * 0.5;\
-    vec4 info = texture2D(water, worldToTex(point));\
-    if (point.y < info.r) {\
-      vec3 shifted = vec3(point.x - point.y * refractedLight.x / refractedLight.y, 0.0, point.z - point.y * refractedLight.z / refractedLight.y);\
-      vec4 caustic = texture2D(causticTex, worldToTex(shifted));\
-      diffuse *= caustic.r * 4.0;\
-    }\
-    color += diffuse;\
     \
     return color;\
   }\
@@ -101,6 +104,7 @@ var helperFunctions = '\
       /* shadow for the rim of the pool */\
       vec2 t = intersectCube(point, refractedLight, vec3(-HALF_W, -poolHeight, -HALF_D), vec3(HALF_W, 2.0, HALF_D));\
       diffuse *= 1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (point.y + refractedLight.y * t.y - 2.0 / 12.0)));\
+      diffuse += 0.15;\
       \
       scale += diffuse * 0.5;\
     }\
@@ -265,6 +269,7 @@ function Renderer() {
     varying vec3 oldPos;\
     varying vec3 newPos;\
     varying vec3 ray;\
+    uniform vec4 sphere[3];\
     \
     void main() {\
       ' + (hasDerivatives ? '\
@@ -281,20 +286,31 @@ function Renderer() {
       /* shadow for the rim of the pool */\
       vec2 t = intersectCube(newPos, -refractedLight, vec3(-HALF_W, -poolHeight, -HALF_D), vec3(HALF_W, 2.0, HALF_D));\
       gl_FragColor.r *= 1.0 / (1.0 + exp(-200.0 / (1.0 + 10.0 * (t.y - t.x)) * (newPos.y - refractedLight.y * t.y - 2.0 / 12.0)));\
+      \
+      /* hard shadow from the balls */\
+      for (int i = 0; i < 3; i++) {\
+        if (intersectSphere(newPos, -refractedLight, sphere[i].xyz, sphere[i].w) < 1.0e6) {\
+          gl_FragColor.r *= 0.0;\
+        }\
+      }\
     }\
   ');
 }
 
-Renderer.prototype.updateCaustics = function(water) {
+Renderer.prototype.updateCaustics = function(water, balls) {
   if (!this.causticsShader) return;
   var this_ = this;
   this.causticTex.drawTo(function() {
     gl.clear(gl.COLOR_BUFFER_BIT);
     water.textureA.bind(0);
-    this_.causticsShader.uniforms({
+    var uniforms = {
       light: this_.lightDir,
       water: 0
-    }).draw(this_.waterMesh);
+    };
+    for (var i = 0; i < 3; i++) {
+      uniforms['sphere[' + i + ']'] = [balls[i].x, balls[i].y, balls[i].z, balls[i].r];
+    }
+    this_.causticsShader.uniforms(uniforms).draw(this_.waterMesh);
   });
 };
 

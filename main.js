@@ -150,7 +150,7 @@ window.onload = function() {
         water.addDrop(pointOnPlane.x, pointOnPlane.z, DROP_RADIUS, 0.01);
         if (paused) {
           water.updateNormals();
-          renderer.updateCaustics(water);
+          renderer.updateCaustics(water, balls);
         }
         break;
       }
@@ -167,7 +167,7 @@ window.onload = function() {
         ball.y = Math.max(ball.r + Physics.POOL_BOTTOM, Math.min(10, ball.y));
         ball.z = Math.max(ball.r - Physics.HALF_D, Math.min(Physics.HALF_D - ball.r, ball.z));
         prevHit = nextHit;
-        if (paused) renderer.updateCaustics(water);
+        if (paused) renderer.updateCaustics(water, balls);
         break;
       }
       case MODE_ORBIT_CAMERA: {
@@ -259,7 +259,7 @@ window.onload = function() {
     water.stepSimulation();
     water.stepSimulation();
     water.updateNormals();
-    renderer.updateCaustics(water);
+    renderer.updateCaustics(water, balls);
   }
 
   function draw() {
