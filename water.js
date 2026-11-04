@@ -29,6 +29,8 @@ function Water() {
   }
   this.dropShader = new GL.Shader(vertexShader, '\
     const float PI = 3.141592653589793;\
+    const float HALF_W = ' + Physics.HALF_W + ';\
+    const float HALF_D = ' + Physics.HALF_D + ';\
     uniform sampler2D texture;\
     uniform vec2 center;\
     uniform float radius;\
@@ -38,8 +40,9 @@ function Water() {
       /* get vertex info */\
       vec4 info = texture2D(texture, coord);\
       \
-      /* add the drop to the height */\
-      float drop = max(0.0, 1.0 - length(center * 0.5 + 0.5 - coord) / radius);\
+      /* add the drop to the height (world-space elliptical drop) */\
+      vec2 world = vec2((coord.x - 0.5) * 2.0 * HALF_W, (coord.y - 0.5) * 2.0 * HALF_D);\
+      float drop = max(0.0, 1.0 - length(world - center) / radius);\
       drop = 0.5 - cos(drop * PI) * 0.5;\
       info.r += drop * strength;\
       \
@@ -93,6 +96,8 @@ function Water() {
     }\
   ');
   this.sphereShader = new GL.Shader(vertexShader, '\
+    const float HALF_W = ' + Physics.HALF_W + ';\
+    const float HALF_D = ' + Physics.HALF_D + ';\
     uniform sampler2D texture;\
     uniform vec3 oldCenter;\
     uniform vec3 newCenter;\
@@ -100,7 +105,8 @@ function Water() {
     varying vec2 coord;\
     \
     float volumeInSphere(vec3 center) {\
-      vec3 toCenter = vec3(coord.x * 2.0 - 1.0, 0.0, coord.y * 2.0 - 1.0) - center;\
+      vec3 world = vec3((coord.x - 0.5) * 2.0 * HALF_W, 0.0, (coord.y - 0.5) * 2.0 * HALF_D);\
+      vec3 toCenter = world - center;\
       float t = length(toCenter) / radius;\
       float dy = exp(-pow(t * 1.5, 6.0));\
       float ymin = min(0.0, center.y - dy);\
@@ -119,6 +125,15 @@ function Water() {
       info.r -= volumeInSphere(newCenter);\
       \
       gl_FragColor = info;\
+    }\
+  ');
+  this.heightTex = new GL.Texture(64, 64, { type: gl.FLOAT, filter: gl.LINEAR });
+  this.heightData = new Float32Array(64 * 64 * 4);
+  this.downsampleShader = new GL.Shader(vertexShader, '\
+    uniform sampler2D texture;\
+    varying vec2 coord;\
+    void main() {\
+      gl_FragColor = texture2D(texture, coord);\
     }\
   ');
 }
@@ -141,8 +156,8 @@ Water.prototype.moveSphere = function(oldCenter, newCenter, radius) {
   this.textureB.drawTo(function() {
     this_.textureA.bind();
     this_.sphereShader.uniforms({
-      oldCenter: oldCenter,
-      newCenter: newCenter,
+      oldCenter: [oldCenter.x, oldCenter.y, oldCenter.z],
+      newCenter: [newCenter.x, newCenter.y, newCenter.z],
       radius: radius
     }).draw(this_.plane);
   });
@@ -169,4 +184,36 @@ Water.prototype.updateNormals = function() {
     }).draw(this_.plane);
   });
   this.textureB.swapWith(this.textureA);
+};
+
+Water.prototype.updateHeightField = function() {
+  var this_ = this;
+  this.heightTex.drawTo(function() {
+    this_.textureA.bind();
+    this_.downsampleShader.uniforms({ texture: 0 }).draw(this_.plane);
+    gl.readPixels(0, 0, this_.heightTex.width, this_.heightTex.height, gl.RGBA, gl.FLOAT, this_.heightData);
+  });
+};
+
+Water.prototype.sampleHeight = function(x, z) {
+  var t = Physics.worldToTex(x, z);
+  var w = this.heightTex.width, h = this.heightTex.height;
+  var fx = t.u * (w - 1), fz = t.v * (h - 1);
+  var x0 = Math.floor(fx), z0 = Math.floor(fz);
+  var x1 = Math.min(x0 + 1, w - 1), z1 = Math.min(z0 + 1, h - 1);
+  var dx = fx - x0, dz = fz - z0;
+  var heightData = this.heightData;
+  function sample(gx, gz) {
+    var i = (gz * w + gx) * 4;
+    return { h: heightData[i], vy: heightData[i + 1] };
+  }
+  var c00 = sample(x0, z0);
+  var c10 = sample(x1, z0);
+  var c01 = sample(x0, z1);
+  var c11 = sample(x1, z1);
+  var h0 = c00.h * (1 - dx) + c10.h * dx;
+  var h1 = c01.h * (1 - dx) + c11.h * dx;
+  var vy0 = c00.vy * (1 - dx) + c10.vy * dx;
+  var vy1 = c01.vy * (1 - dx) + c11.vy * dx;
+  return { h: h0 * (1 - dz) + h1 * dz, vy: vy0 * (1 - dz) + vy1 * dz };
 };
